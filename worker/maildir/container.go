@@ -117,10 +117,9 @@ func (c *Container) UIDs(d maildir.Dir) ([]models.UID, error) {
 	return uids, err
 }
 
-// Message returns a Message struct for the given UID and maildir
-func (c *Container) Message(d maildir.Dir, uid models.UID) (*Message, error) {
-	c.Lock()
-	defer c.Unlock()
+// message returns a Message struct for the given UID and maildir.
+// Callers should hold the container lock.
+func (c *Container) message(d maildir.Dir, uid models.UID) (*Message, error) {
 	if m, ok := c.msgCache[uid]; ok && m.dir == d {
 		return m, nil
 	}
@@ -133,6 +132,13 @@ func (c *Container) Message(d maildir.Dir, uid models.UID) (*Message, error) {
 	return m, nil
 }
 
+// Message returns a Message struct for the given UID and maildir
+func (c *Container) Message(d maildir.Dir, uid models.UID) (*Message, error) {
+	c.Lock()
+	defer c.Unlock()
+	return c.message(d, uid)
+}
+
 // DeleteAll deletes a set of messages by UID and returns the subset of UIDs
 // which were successfully deleted, stopping upon the first error.
 func (c *Container) DeleteAll(d maildir.Dir, uids []models.UID) ([]models.UID, error) {
@@ -140,7 +146,7 @@ func (c *Container) DeleteAll(d maildir.Dir, uids []models.UID) ([]models.UID, e
 	defer c.Unlock()
 	var success []models.UID
 	for _, uid := range uids {
-		msg, err := c.Message(d, uid)
+		msg, err := c.message(d, uid)
 		if err != nil {
 			return success, err
 		}
